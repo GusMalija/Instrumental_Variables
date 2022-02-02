@@ -1,0 +1,204 @@
+---
+title: "Assignment 5 - Statistics II, Hertie School"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+# load packages
+library(dplyr)
+library(ggplot2)
+#install.packages("summarytools")
+library(summarytools)
+library(stargazer)
+library(kableExtra)
+library(AER)
+library(foreign)
+library(stargazer)
+
+set.seed(134)
+```
+
+<br>
+
+### Task 1 - On the search for plausible instruments [4 points in total]
+
+Come up with a plausible instrument in the following scenarios and justify your choice in 1-3 sentences.
+
+(a)  Scenario 1 [2 pts] <br>
+Units: US counties at US House election <br>
+Treatment: voter turnout  <br>
+Outcome: share of Democrat party <br>
+
+<div style="color:blue">
+
+Levels of education affect voter turnout.The higher levels of education one has, the more likely they will vote for democratic.
+
+</div>
+
+(b) Scenario 2 [2 pts]  <br>
+Units: Voters  <br>
+Treatment: exposure to Fox News  <br>
+Outcome: vote for Republican party <br>
+
+<div style="color:blue">
+
+Republican Media bias (automatic access to fox news) is a plausible instrument. Voter are likely to voter for republican if their exposure to news is biased towards fox news news.
+
+</div>
+
+<br>
+
+### Task 2 - Bert and Ernie's impact on letter recognition [14 points in total]
+
+Suppose we want to estimate the effect of watching an educational television program - Sesame Street - on letter recognition. We might consider implementing a randomized experiment where the participants are preschool children, the treatment of interest is watching Sesame Street, the control condition is not watching, and the outcome is the score on a test of letter recognition. It is not possible here for the experimenter to force children to watch a TV show or to refrain from watching (the experiment took place while Sesame Street was on the air).
+
+```{r, message=F}
+dat <- foreign::read.dta("sesame.dta")
+```
+
+Using the dataset `sesame.dta` where letter recognition is the outcome of interest (`postlet`), regularly watching Sesame Street is the treatment (`regular`) and the encouragement to watch is the instrument (`encour`), do the following:
+
+(a) Discuss the assumptions needed for the identification of the Sesame Street effect and potential violations. [4 pts]
+
+<div style="color:blue">
+1. Relevance: If our variable encouragement creates a difference in regularly watching Sesame street (regular). It should lead to a difference in test scores between the treatment and the control group.
+
+2. Ignorability: Potential outcomes and treatments are independent of the encouragement to watch.Our variable encouragement is not influenced by any other unobserved variable.
+
+3. Exclusion restriction: Our variable encouragement only affects our outcome of interest (postlet) through the treatment regularly watching Sesame street. It can not affect it through any other means.
+
+4. Monotonicity: No defires. We do not expect anyone who was encouraged to watch not to watch Sesame street and who was not encouraged to watch Sesame street.
+</div>
+
+<br>
+
+(b) Illustrate visually the difference in the outcome of interest between the treatment and the control group. [2 pts]
+
+```{r, message=F}
+min(dat$postlet)
+max(dat$postlet)
+
+#plotting graphically
+ggplot(dat, aes(x = factor(encour), 
+                      y = factor(regular), 
+                      color = factor(postlet))) +
+  geom_point() +
+  geom_jitter() +
+  theme_minimal() +
+  scale_x_discrete(labels = c("encour = 0", "encour = 1")) +
+  scale_y_discrete(labels = c("regular = 0", "regular = 1")) +
+  labs(x = "Encouragement",
+       y = "Treatment",
+       color = "")
+
+
+#Cavieat. I ommited this line of code to see accurately the scores in letter recognition as indicated in the postlet variable because including it identifies score 0 and 6 as NAs which are hard to identify since they all have the same color
+#scale_color_discrete(labels = c("Worse Recognition", "Better Recognition"))
+```
+Interpretation
+
+Interpretation
+
+From the graph, we see that colors representing high scores beggining from roughly 20 to 63 are on the area where kids were encouraged and regularly watched sesame street. This indicates that encoragement to watch Sesame street has positive effects of helping kids recognize letters.
+
+<br>
+
+(c) What do we know about non-compliance in the data? Give a table or visual representation plus a short description. Also, report a statistic showing whether the encouragement can or cannot be considered a strong instrument. [2 pts]
+
+```{r, message=F}
+#to get rid of NAs
+st_options(footnote = NA)
+
+#Plotting graphically
+print(ctable(dat$regular, dat$encour, prop = "n"), 
+      method = "render")
+```
+
+From the table,  non-compliers/defiers are represented by scores of 48 and 14 where those with a score of 48 are always takers and those with a score of 14 are never takers. Non compliance rate (48+14/240) is 25.8 percent.
+
+To see whether the encouragement can or can not be considered a strong instrument
+```{r}
+summary(lm(regular ~ encour, dat))
+```
+
+From the regression table, we have an F-Statistic of 50.46. This indicates that the encouragement is a strong instument since it is greater than 10, our rule of thumb.
+
+<br>
+
+(d) Provide a naïve estimate of watching on letter recognition, ignoring the encouragement mechanism. Then, use other variables in the data set for a selection-on-observables approach to calculate a less-naïve estimate. [3 pts]
+
+```{r, eval= TRUE}
+naive_model <- lm(postlet ~ regular, dat)
+
+summary(naive_model)
+```
+
+The NAIVE estimate of watching on letter recognition is 12.7 meaning that kids who regularly watched Sesame street scored 12.7 more points than non-watchers. This is a strong estimate because our f-statistic is greater than 10.
+
+
+Using other variables in the data (lm x~a+b+c, dat)
+```{r}
+less_naive_model <- lm(postlet ~ regular+age+sex, dat)
+
+summary(less_naive_model)
+```
+Interpretation
+
+With a less naive model, we observe that our less naive estimate is 12.8 which is higher than the naive estimate. Our F Statistic is still higher than 10 indicating of a strong estimate.
+
+<br>
+
+(e) Provide estimates for the ITT and the LATE and give a brief substantive interpretation of both results! [3 pts]
+
+An estimate for the ITT  
+```{r, eval= TRUE}
+itt_model <- lm(postlet ~ encour, dat)
+summary(itt_model)
+```
+From the results, Our ITT is approximately 2.9 that indicates that the effect of encouragement itself on the outcome regardless of actual treatment is 2.9 higher than that of non-encouragement. In context, our ITT is the effect of assigning Sesame Street on the outcome.
+
+Estimates for the LATE
+```{r}
+late_model <- ivreg(postlet ~ regular | encour, data = dat)
+
+summary(late_model)
+```
+
+<div style="color:blue">
+
+From the results, Our LATE estimate is 7.9 higher for those encouraged compared to those not encouraged to watch Sesame street. In context, our LATE is the actual effect of watching Sesame Street on letter recognition.
+
+</div>
+
+<br>
+
+### Task 3 - Simulating a flawed instrument [3 points in total]
+
+Go back to the simulation code from the Lab and refine it such that Z is a flawed instrument as it is also connected with Y through a variable other than X. Then, show how these modifications change the estimates of the original setup!  [3 pts]
+
+<br>
+
+
+```{r}
+# generating xStar and c and using a common variance
+xBen <- MASS::mvrnorm(1000, c(20, 15), matrix(c(1, 0.5, 0.5, 1), 2, 2))
+xStar <- xBen[, 1]
+c <- xBen[, 2]
+
+# z is truly exogenous; x a combination of xStar and z
+z <- rnorm(1000)
+x <- xStar + z
+
+# generating the response variable y
+y <- 1 + x + c + rnorm(1000, 0, 0.5)
+
+summary(lm(x ~ z))
+```
+
+Modifying the results by reducing how much of x is dependent on z by introducing a coefficient 0.04 on z
+```{r}
+x <- xStar + 0.04*z
+
+summary(lm(x ~ z))
+```
+From the results, we can tell that z has been adjusted to a weaker instrument since our F Statistic now is less than 10.
